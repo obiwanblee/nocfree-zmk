@@ -290,6 +290,141 @@ index 17cdc5d..77de83d 100644
      }
  
      LOG_DBG("Preferred endpoint transport is %d but no transports are ready", preferred_transport);
+diff --git a/app/src/hog.c b/app/src/hog.c
+index c7d9b86..4a9f9a8 100644
+--- a/app/src/hog.c
++++ b/app/src/hog.c
+@@ -307,10 +307,27 @@ struct k_work_q hog_work_q;
+ K_MSGQ_DEFINE(zmk_hog_keyboard_msgq, sizeof(struct zmk_hid_keyboard_report_body),
+               CONFIG_ZMK_BLE_KEYBOARD_REPORT_QUEUE_SIZE, 4);
+ 
+-void send_keyboard_report_callback(struct k_work *work) {
++/* HOGDROP (nocfree local patch): the stock loop POPPED a report and then, on
++ * any notify error (-ENOMEM = TX pool exhausted on a degraded link), threw it
++ * away behind a compiled-out LOG_DBG. HID reports are absolute state, so a
++ * discarded report whose successor never comes — e.g. the final RELEASE of a
++ * typing burst — is a key stuck at the host until the next keypress. Same
++ * defect class as the split-side notify drop patched separately (SPLITDROP),
++ * one hop later. Now: PEEK, notify, pop only on success; on failure count it,
++ * say so on the console (rate-limited), and retry shortly — a lost release
++ * becomes a late release. The retry naturally stops when the profile conn
++ * drops (conn == NULL return). */
++#define HOG_RETRY_DELAY_MS 20
++
++static uint32_t hog_drop_count;
++
++static void send_keyboard_report_callback(struct k_work *work);
++static K_WORK_DELAYABLE_DEFINE(hog_keyboard_work, send_keyboard_report_callback);
++
++static void send_keyboard_report_callback(struct k_work *work) {
+     struct zmk_hid_keyboard_report_body report;
+ 
+-    while (k_msgq_get(&zmk_hog_keyboard_msgq, &report, K_NO_WAIT) == 0) {
++    while (k_msgq_peek(&zmk_hog_keyboard_msgq, &report) == 0) {
+         struct bt_conn *conn = zmk_ble_active_profile_conn();
+         if (conn == NULL) {
+             return;
+@@ -323,18 +340,26 @@ void send_keyboard_report_callback(struct k_work *work) {
+         };
+ 
+         int err = bt_gatt_notify_cb(conn, &notify_params);
+-        if (err == -EPERM) {
+-            bt_conn_set_security(conn, BT_SECURITY_L2);
+-        } else if (err) {
+-            LOG_DBG("Error notifying %d", err);
++        if (err) {
++            if (err == -EPERM) {
++                bt_conn_set_security(conn, BT_SECURITY_L2);
++            }
++            hog_drop_count++;
++            if ((hog_drop_count & 0x1f) == 1) {
++                printk("HOGDROP: kb notify err %d (count %u) — retrying\n", err,
++                       hog_drop_count);
++            }
++            bt_conn_unref(conn);
++            k_work_reschedule_for_queue(&hog_work_q, &hog_keyboard_work,
++                                        K_MSEC(HOG_RETRY_DELAY_MS));
++            return;
+         }
+ 
++        (void)k_msgq_get(&zmk_hog_keyboard_msgq, &report, K_NO_WAIT);
+         bt_conn_unref(conn);
+     }
+ }
+ 
+-K_WORK_DEFINE(hog_keyboard_work, send_keyboard_report_callback);
+-
+ int zmk_hog_send_keyboard_report(struct zmk_hid_keyboard_report_body *report) {
+     int err = k_msgq_put(&zmk_hog_keyboard_msgq, report, K_MSEC(100));
+     if (err) {
+@@ -351,7 +376,7 @@ int zmk_hog_send_keyboard_report(struct zmk_hid_keyboard_report_body *report) {
+         }
+     }
+ 
+-    k_work_submit_to_queue(&hog_work_q, &hog_keyboard_work);
++    k_work_reschedule_for_queue(&hog_work_q, &hog_keyboard_work, K_NO_WAIT);
+ 
+     return 0;
+ };
+@@ -359,10 +384,14 @@ int zmk_hog_send_keyboard_report(struct zmk_hid_keyboard_report_body *report) {
+ K_MSGQ_DEFINE(zmk_hog_consumer_msgq, sizeof(struct zmk_hid_consumer_report_body),
+               CONFIG_ZMK_BLE_CONSUMER_REPORT_QUEUE_SIZE, 4);
+ 
+-void send_consumer_report_callback(struct k_work *work) {
++/* HOGDROP: same peek/notify/pop-on-success shape as keyboard above. */
++static void send_consumer_report_callback(struct k_work *work);
++static K_WORK_DELAYABLE_DEFINE(hog_consumer_work, send_consumer_report_callback);
++
++static void send_consumer_report_callback(struct k_work *work) {
+     struct zmk_hid_consumer_report_body report;
+ 
+-    while (k_msgq_get(&zmk_hog_consumer_msgq, &report, K_NO_WAIT) == 0) {
++    while (k_msgq_peek(&zmk_hog_consumer_msgq, &report) == 0) {
+         struct bt_conn *conn = zmk_ble_active_profile_conn();
+         if (conn == NULL) {
+             return;
+@@ -375,18 +404,26 @@ void send_consumer_report_callback(struct k_work *work) {
+         };
+ 
+         int err = bt_gatt_notify_cb(conn, &notify_params);
+-        if (err == -EPERM) {
+-            bt_conn_set_security(conn, BT_SECURITY_L2);
+-        } else if (err) {
+-            LOG_DBG("Error notifying %d", err);
++        if (err) {
++            if (err == -EPERM) {
++                bt_conn_set_security(conn, BT_SECURITY_L2);
++            }
++            hog_drop_count++;
++            if ((hog_drop_count & 0x1f) == 1) {
++                printk("HOGDROP: cons notify err %d (count %u) — retrying\n", err,
++                       hog_drop_count);
++            }
++            bt_conn_unref(conn);
++            k_work_reschedule_for_queue(&hog_work_q, &hog_consumer_work,
++                                        K_MSEC(HOG_RETRY_DELAY_MS));
++            return;
+         }
+ 
++        (void)k_msgq_get(&zmk_hog_consumer_msgq, &report, K_NO_WAIT);
+         bt_conn_unref(conn);
+     }
+ };
+ 
+-K_WORK_DEFINE(hog_consumer_work, send_consumer_report_callback);
+-
+ int zmk_hog_send_consumer_report(struct zmk_hid_consumer_report_body *report) {
+     int err = k_msgq_put(&zmk_hog_consumer_msgq, report, K_MSEC(100));
+     if (err) {
+@@ -403,7 +440,7 @@ int zmk_hog_send_consumer_report(struct zmk_hid_consumer_report_body *report) {
+         }
+     }
+ 
+-    k_work_submit_to_queue(&hog_work_q, &hog_consumer_work);
++    k_work_reschedule_for_queue(&hog_work_q, &hog_consumer_work, K_NO_WAIT);
+ 
+     return 0;
+ };
 diff --git a/app/src/split/bluetooth/service.c b/app/src/split/bluetooth/service.c
 index 5bbed13..8d619cd 100644
 --- a/app/src/split/bluetooth/service.c

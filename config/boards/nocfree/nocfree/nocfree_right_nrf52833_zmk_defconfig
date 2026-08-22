@@ -117,3 +117,7 @@ CONFIG_BT_SMP_ALLOW_UNAUTH_OVERWRITE=y
 CONFIG_BT_BUF_ACL_TX_COUNT=8
 CONFIG_BT_L2CAP_TX_BUF_COUNT=8
 CONFIG_BT_CONN_TX_MAX=8
+
+# GC pre-pay at boot: a mid-session settings-store page erase can never fit
+# the radio schedule; rotate the sector while the radio is still off instead.
+CONFIG_NOCFREE_NVS_BOOT_GC=y

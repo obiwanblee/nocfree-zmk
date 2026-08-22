@@ -22,6 +22,8 @@ grep -q 'CONFIG_BOARD_NOCFREE_LEFT' /workspace/zmk/app/src/endpoints.c || {
   echo "!! zmk/ endpoints no-USB-fallback patch MISSING (BT/2.4G would leak HID to USB)"; exit 1; }
 grep -q 'zmk_ble_force_readvertise' /workspace/zmk/app/src/ble.c || {
   echo "!! zmk/ force-readvertise patch MISSING (adv watchdog would not link)"; exit 1; }
+grep -q 'HOGDROP' /workspace/zmk/app/src/hog.c || {
+  echo "!! zmk/ HOGDROP patch MISSING — re-apply patches/zmk-local-patches.patch"; exit 1; }
 echo "== building $board (out=$bdir) =="
 rm -rf "$bdir"
 mkdir -p "$bdir"
@@ -65,6 +67,8 @@ if grep -q '^CONFIG_ZMK_BLE_CLEAR_BONDS_ON_START=y' "$CFG"; then
 fi
 grep -q '^CONFIG_ZMK_KSCAN_DEDICATED_WORKQUEUE=y' "$CFG" || {
   echo "!! kscan dedicated workqueue missing (stuck-key/disconnect-cascade fix)"; exit 1; }
+grep -q '^CONFIG_NOCFREE_NVS_BOOT_GC=y' "$CFG" || {
+  echo "!! NVS boot GC missing (mid-session GC erase starves the radio schedule)"; exit 1; }
 grep -q '^CONFIG_NOCFREE_ACTIVITY_SYNC=y' "$CFG" || {
   echo "!! activity sync missing (right idles/deep-sleeps mid-session without it)"; exit 1; }
 # Split-link drop hardening: deeper TX pool, and a central position queue big

@@ -17,6 +17,8 @@ zephyr_library_sources_ifdef(CONFIG_NOCFREE_BACKLIGHT_PROBE src/backlight_probe.
 zephyr_library_sources_ifdef(CONFIG_NOCFREE_BACKLIGHT_SYNC src/split_backlight_sync.c)
 zephyr_library_sources_ifdef(CONFIG_NOCFREE_BACKLIGHT_BOOT_ON src/backlight_boot_on.c)
 zephyr_library_sources_ifdef(CONFIG_NOCFREE_BATTERY_BAS_MIN src/battery_bas_min.c)
+# Pure-Zephyr APIs (settings/nvs); needs no zmk includes.
+zephyr_library_sources_ifdef(CONFIG_NOCFREE_NVS_BOOT_GC src/nvs_boot_gc.c)
 
 # key_selftest.c and split_backlight_sync.c call into ZMK proper
 # (zmk/event_manager.h, zmk/split/central.h). Same include gap as

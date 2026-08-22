@@ -46,6 +46,8 @@ if grep -q '^CONFIG_ZMK_BLE_CLEAR_BONDS_ON_START=y' "$CFG"; then
 fi
 grep -q '^CONFIG_ZMK_KSCAN_DEDICATED_WORKQUEUE=y' "$CFG" || {
   echo "!! kscan dedicated workqueue missing (stuck-key/disconnect-cascade fix)"; exit 1; }
+grep -q '^CONFIG_NOCFREE_NVS_BOOT_GC=y' "$CFG" || {
+  echo "!! NVS boot GC missing (mid-session GC erase starves the radio schedule)"; exit 1; }
 # This half is the notifier, so its TX pool depth is the one that matters.
 grep -q '^CONFIG_BT_CONN_TX_MAX=8$' "$CFG" || { echo "!! right BT_CONN_TX_MAX not 8 (split notify drop)"; exit 1; }
 grep -q '^CONFIG_BT_BUF_ACL_TX_COUNT=8$' "$CFG" || { echo "!! right BT_BUF_ACL_TX_COUNT not 8"; exit 1; }

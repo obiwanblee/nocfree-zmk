@@ -217,7 +217,7 @@
 			, <&key_physical_attrs 100 100 1250  400 0 0 0>
 			, <&key_physical_attrs 150 100 1350  400 0 0 0>
 			, <&key_physical_attrs 100 100 1450  400 0 0 0>
-			, <&key_physical_attrs 100 100 1550  200 0 0 0>
+			, <&key_physical_attrs 100 100 1650  200 0 0 0>	/* pos 87 PgDn: was 1550, which sat exactly on top of pos 71 (\) */
 			, <&key_physical_attrs 200 100  850  500 0 0 0>
 			, <&key_physical_attrs 100 100 1050  500 0 0 0>
 			, <&key_physical_attrs 100 100 1150  500 0 0 0>

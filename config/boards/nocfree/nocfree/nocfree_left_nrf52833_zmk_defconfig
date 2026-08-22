@@ -152,3 +152,7 @@ CONFIG_ZMK_SPLIT_BLE_CENTRAL_POSITION_QUEUE_SIZE=16
 # gets a free peripheral slot after leaving Bluetooth. Warm reboot matches
 # vendor behaviour and clears host state cleanly.
 CONFIG_NOCFREE_MODE_SWITCH_REBOOT=y
+
+# GC pre-pay at boot: a mid-session settings-store page erase can never fit
+# the radio schedule; rotate the sector while the radio is still off instead.
+CONFIG_NOCFREE_NVS_BOOT_GC=y

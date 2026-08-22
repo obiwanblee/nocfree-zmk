@@ -248,6 +248,17 @@ static void schedule_2p4g_host_kicks(void) {
  * rejected pair). While parked on the dongle profile and unconnected, force a
  * stop+start cycle every few seconds; silent no-op once the dongle links.
  */
+/*
+ * QUEUE PLACEMENT IS LOAD-BEARING -- this watchdog MUST stay on the SYSTEM
+ * workqueue. Its clear path runs bt_unpair(), which on a peer with a live
+ * conn calls bt_conn_disconnect() -> bt_hci_cmd_send_sync(). On this stack
+ * (Zephyr 4.1, BT_RECV_WORKQ_BT) send_sync is lethal from the BT RX
+ * workqueue (self-wait -> BT_ASSERT -> CPU halt) and empirically unsafe
+ * even from a dedicated workqueue. The system workqueue is the ONE thread
+ * with an explicit survival path: send_sync detects it and drains the
+ * command queue in-place (hci_core.c:410). Do not "clean this up" onto
+ * its own queue.
+ */
 static struct k_work_delayable adv_watchdog_work;
 
 /*

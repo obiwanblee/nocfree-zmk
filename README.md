@@ -63,7 +63,7 @@ Everything below is implemented and running as a daily driver.
 | Capability | Detail |
 |---|---|
 | Deep sleep | SYSTEM OFF after 30 min on battery; wake on any keypress via the expanders' shared interrupt |
-| Soft-off | Fn hold (~2 s) for a deliberate power-down |
+| Soft-off | Fn+B hold (~2 s) for a deliberate power-down |
 | Session-aware idling | The central pushes activity to the peripheral, so both halves idle and sleep together instead of the right half dropping mid-session |
 | Battery | Stock-style percentage curve; the host is shown the weaker of the two halves |
 
@@ -75,6 +75,8 @@ These exist because each one was a real failure that took a while to pin down:
 |---|---|
 | Stuck-key prevention | The scan runs on its own thread, so a busy system workqueue can't make it miss a key release — and can't cascade into a BLE supervision timeout |
 | Serialized HID forwarding | The dongle's report queue is drained under a lock, so concurrent BLE/USB callbacks can't drop the final key release of a burst |
+| No silently dropped releases | The left's BLE-HID send used to discard a report on any radio-fade error — if that report was a key release, the key stuck. It now retries until delivered and counts every incident on the console (`HOGDROP`) |
+| Boot-time settings GC | A settings-store page erase (~85 ms, atomic) can never fit between 7.5 ms radio events, so mid-session garbage collection could stall the firmware mid-typing. Each boot now rotates the sector while the radio is still off, so it never has to happen mid-session |
 | Advertising watchdog | ZMK restarts advertising only from BLE events; one failed start otherwise leaves the radio silently dead forever. A watchdog forces it back |
 | Bond-deadlock self-heal | A dongle restart used to deadlock pairing until a power cycle; the left now reopens the slot on its own within ~30–60 s |
 | Dongle link recovery | Verified subscriptions (no "connected but dead"), stale-connection isolation, and exponential backoff on radio resets |

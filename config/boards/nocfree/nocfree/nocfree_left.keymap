@@ -7,15 +7,26 @@
  * inert placeholder -- peripherals never evaluate bindings.
  *
  * PHYSICAL LAYOUT (vendor grid; '|' = the empirical half split):
- *   r0  ESC  F1 F2 F3 F4 F5 F6 | F7 F8 F9 F10 F11 F12 PRTSC HOME
- *   r1  GRV  1  2  3  4  5  6  | 7  8  9   0   -   =   BKSP PGUP
- *   r2  TAB  Q  W  E  R  T     | Y  U  I   O   P   [   ]    \
- *   r3  CAPS A  S  D  F  G     | H  J  K   L   ;   '   RET  DEL
- *   r4  LSFT Z  X  C  V  B     | N  M  ,   .   /   RSFT UP   PGDN
- *   r5  FN   LCT LAL LGI SPC SPC | SPC RGI FN RALT LEFT DOWN RIGHT
- * (r5 resolved 2026-08-09: 13 keys, undumped seam column at c7. The
- * top-right cluster is still DISPUTED vs the empirical map -- see the
- * LEFT_WIDTH comments in the tool; verify by keycap)
+ *   r0  ESC  F1 F2 F3 F4 F5 F6 | F7 F8 F9 F10 F11 F12 PRTSC HOME DEL
+ *   r1  GRV  1  2  3  4  5  6  | 7  8  9   0   -   =   BKSP  PGUP
+ *   r2  TAB  Q  W  E  R  T     | Y  U  I   O   P   [   ]     \     PGDN
+ *   r3  CAPS A  S  D  F  G     | H  J  K   L   ;   '   RET
+ *   r4  LSFT Z  X  C  V  B     | N  M  ,   .   /   RSFT  UP
+ *   r5  FN   LCT LAL LGI SPC   | SPC RGI FN RALT LEFT DOWN RIGHT
+ *
+ * RIGHT-HAND COLUMN -- CONFIRMED BY KEYCAP. This replaces an earlier guess
+ * that put DEL at the end of r3 and PGDN at the end of r4; both were wrong.
+ * DEL is in the TOP row next to HOME, PGUP is in r1, and PGDN is in r2 at
+ * the far right edge just past the backslash. (The Studio layout used to
+ * place PGDN on the same coordinates as the backslash, hiding the backslash
+ * completely in the editor -- fixed in nocfree.dtsi.)
+ *
+ * ALSO CONFIRMED ON HARDWARE:
+ *   - the left half's top row ENDS AT F6. There is no switch at pos 7, so
+ *     nothing reachable may be bound there (an earlier soft-off binding
+ *     there could never have fired).
+ *   - the left bottom row has ONE long spacebar (pos 44). Pos 45 is a
+ *     phantom matrix slot with no switch behind it.
  *
  * LAYERS: 0 = Win (DEFAULT: the user's host is Windows behind a KVM; stock
  * defaults to macOS), 1 = Fn, 2 = Mac, 3 = Recover. Fn+M -> Mac, Fn+N -> Win
@@ -91,12 +102,12 @@
 		fn_layer: layer_1 {
 			display-name = "Fn";
 			bindings = <
-			&bt BT_CLR         &kp F1             &kp F2             &kp F3             &kp F4             &kp F5             &kp F6             &soft_off	/* pos 0-7: CLR / F-keys / hold soft-off 2s */
+			&bt BT_CLR         &kp F1             &kp F2             &kp F3             &kp F4             &kp F5             &kp F6             &none	/* pos 0-7: pos 7 has NO PHYSICAL KEY (left top row ends at F6) */
 			/* Host BT slots 1–3; profile 0 is dongle/2.4G (mode switch). */
 			&kp GRAVE          &bt BT_SEL 1       &bt BT_SEL 2       &bt BT_SEL 3       &none              &none              &none              &none	/* pos 8-15 */
 			&bl BL_TOG         &trans             &trans             &trans             &trans             &trans             &none              &none	/* pos 16-23 */
 			&trans             &trans             &trans             &trans             &trans             &trans             &none              &none	/* pos 24-31 */
-			&trans             &trans             &trans             &trans             &trans             &none              &none              &none	/* pos 32-39 */
+			&trans             &trans             &trans             &trans             &trans             &soft_off          &none              &none	/* pos 32-39: Fn+B (pos 37) = hold 2 s for soft-off */
 			&trans             &trans             &trans             &trans             &trans             &trans             &none              &none	/* pos 40-47 */
 			&kp F7             &kp F8             &kp F9             &kp F10            &kp F11            &kp F12            &trans             &studio_unlock	/* pos 48-55: Fn+Home = unlock ZMK Studio */
 			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 56-63 */
@@ -143,15 +154,60 @@
 			>;
 		};
 
-		/* Empty slots Studio can enable without reflashing. */
+		/*
+		 * Empty slots ZMK Studio can enable without reflashing.
+		 *
+		 * The bindings below are LOAD-BEARING, not decoration. A layer node
+		 * with no `bindings` property compiles, via TRANSFORMED_LAYER in
+		 * zmk/app/src/keymap.c, to an EMPTY initialiser -- i.e. 96 zeroed
+		 * bindings whose behavior_dev is NULL and whose behavior local id is
+		 * 0. Studio cannot resolve id 0, so "add layer" produced a layer that
+		 * rendered blank AND could not be clicked. Not a Studio bug.
+		 *
+		 * &trans (not a copy of the base layer) is deliberate: a new layer
+		 * should fall through to whatever is beneath it, so you override only
+		 * what you change and later edits to the base still propagate.
+		 *
+		 * Costs no flash worth counting -- the keymap array is dimensioned
+		 * [layers][96] regardless, so this space was already allocated and
+		 * merely held zeros.
+		 */
 		studio_extra_0: layer_4 {
 			display-name = "Extra1";
 			status = "reserved";
+			bindings = <
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 0-7 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 8-15 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 16-23 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 24-31 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 32-39 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 40-47 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 48-55 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 56-63 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 64-71 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 72-79 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 80-87 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 88-95 */
+			>;
 		};
 
 		studio_extra_1: layer_5 {
 			display-name = "Extra2";
 			status = "reserved";
+			bindings = <
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 0-7 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 8-15 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 16-23 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 24-31 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 32-39 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 40-47 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 48-55 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 56-63 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 64-71 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 72-79 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 80-87 */
+			&trans             &trans             &trans             &trans             &trans             &trans             &trans             &trans	/* pos 88-95 */
+			>;
 		};
 	};
 

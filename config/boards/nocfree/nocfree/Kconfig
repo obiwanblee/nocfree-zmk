@@ -320,3 +320,32 @@ config NOCFREE_MODE_SWITCH_INIT_PRIORITY
 	  own GPIO, not an expander.
 
 endif
+
+config NOCFREE_NVS_BOOT_GC
+	bool "Pre-pay NVS garbage collection at boot (radio-off window)"
+	depends on SETTINGS_NVS
+	help
+	  A settings-store GC page erase is ~85 ms atomic and can never be
+	  granted a radio timeslot on a schedule running the 7.5 ms split link,
+	  so a mid-session GC can only time out and thrash. This runs before
+	  BLE init (radio off, erases free): if the active NVS sector lacks the
+	  session budget, force the rotation now via padded settings writes, so
+	  GC never needs to run mid-session.
+
+config NOCFREE_NVS_BOOT_GC_MIN_FREE
+	int "Minimum NVS free bytes guaranteed at session start"
+	depends on NOCFREE_NVS_BOOT_GC
+	default 1024
+	help
+	  A session writes at most a few hundred bytes (wake bond rewrite, CCC
+	  records, backlight state). 1 KB of guaranteed headroom means the
+	  sector cannot tip into GC before the next boot.
+
+config NOCFREE_NVS_BOOT_GC_INIT_PRIORITY
+	int "Init priority for the boot GC (must be below ZMK_BLE_INIT_PRIORITY)"
+	depends on NOCFREE_NVS_BOOT_GC
+	default 49
+	help
+	  ZMK enables BLE at APPLICATION priority 50 (zmk/app/Kconfig). Running
+	  at 49 guarantees the radio is off, so the forced erase needs no
+	  timeslot negotiation at all.
